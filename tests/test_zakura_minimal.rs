@@ -186,3 +186,22 @@ fn zakura_workload() {
 
     assert_eq!(DB::list_cf(&opts, &path).unwrap().len(), 3);
 }
+
+/// Without `full`, tailing iterators are not built in: creating one reports
+/// `NotSupported` instead of reading.
+#[cfg(not(feature = "full"))]
+#[test]
+fn tailing_iterators_are_not_built_in() {
+    let path = DBPath::new("_rust_rocksdb_zakura_minimal_tailing");
+    let db = DB::open_default(&path).unwrap();
+    db.put(b"key", b"value").unwrap();
+
+    let mut read_options = ReadOptions::default();
+    read_options.set_tailing(true);
+    let mut iterator = db.raw_iterator_opt(read_options);
+    iterator.seek_to_first();
+
+    assert!(!iterator.valid());
+    let error = iterator.status().unwrap_err();
+    assert_eq!(error.kind(), rocksdb::ErrorKind::NotSupported, "{error}");
+}
