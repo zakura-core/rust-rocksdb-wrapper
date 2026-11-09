@@ -270,6 +270,93 @@ Status DBImpl::StartIOTrace(const TraceOptions& trace_options,
   return Status::NotSupported("remote compaction is not built in");
 "#,
     },
+    // Multi-column-family coalescing and attribute group iterators
+    // (`DB::NewCoalescingIterator`, `DB::NewAttributeGroupIterator`).
+    Edit::ReplaceBody {
+        file: "db/db_impl/db_impl.cc",
+        signature: r#"
+std::unique_ptr<Iterator> DBImpl::NewCoalescingIterator(
+    const ReadOptions& _read_options,
+    const std::vector<ColumnFamilyHandle*>& column_families) {
+"#,
+        body: r#"
+  return std::unique_ptr<Iterator>(NewErrorIterator(
+      Status::NotSupported("coalescing iterators are not built in")));
+"#,
+    },
+    Edit::ReplaceBody {
+        file: "db/db_impl/db_impl.cc",
+        signature: r#"
+std::unique_ptr<AttributeGroupIterator> DBImpl::NewAttributeGroupIterator(
+    const ReadOptions& _read_options,
+    const std::vector<ColumnFamilyHandle*>& column_families) {
+"#,
+        body: r#"
+  return NewAttributeGroupErrorIterator(
+      Status::NotSupported("attribute group iterators are not built in"));
+"#,
+    },
+    // Tailing iterators (`ReadOptions::tailing`), which `ForwardIterator`
+    // implements.
+    Edit::Replace {
+        file: "db/db_impl/db_impl.cc",
+        find: r#"
+    auto iter = new ForwardIterator(this, read_options, cfd, sv,
+                                    /* allow_unprepared_value */ true);
+    // TODO(cbi): Add support for `memtable_op_scan_flush_trigger` for tailing
+    // iterator. This requires refreshing DBIter's pointer to active_mem when
+    // tailing iterator refreshes to new memtable internally.
+    result = DBIter::NewIter(env_, read_options, cfd->ioptions(),
+                             sv->mutable_cf_options, cfd->user_comparator(),
+                             iter, sv->current, kMaxSequenceNumber,
+                             /*read_callback=*/nullptr, /*active_mem=*/nullptr,
+                             cfh, /*expose_blob_index=*/false);
+"#,
+        with: r#"
+    CleanupSuperVersion(sv);
+    result = NewErrorIterator(
+        Status::NotSupported("tailing iterators are not built in"));
+"#,
+    },
+    // `DB::NewIterators` rejects tailing iterators before it references any
+    // super versions, so the tailing branch below it creates nothing.
+    Edit::InsertAfter {
+        file: "db/db_impl/db_impl.cc",
+        after: r#"
+  if (read_options.read_tier == kPersistedTier) {
+    return Status::NotSupported(
+        "ReadTier::kPersistedData is not yet supported in iterators.");
+  }
+
+  autovector<ColumnFamilySuperVersionPair, MultiGetContext::MAX_BATCH_SIZE>
+      cf_sv_pairs;
+"#,
+        insert: r#"
+  if (read_options.tailing) {
+    return Status::NotSupported("tailing iterators are not built in");
+  }
+"#,
+    },
+    Edit::Replace {
+        file: "db/db_impl/db_impl.cc",
+        find: r#"
+    for (const auto& cf_sv_pair : cf_sv_pairs) {
+      auto iter = new ForwardIterator(this, read_options, cf_sv_pair.cfd,
+                                      cf_sv_pair.super_version,
+                                      /* allow_unprepared_value */ true);
+      iterators->push_back(DBIter::NewIter(
+          env_, read_options, cf_sv_pair.cfd->ioptions(),
+          cf_sv_pair.super_version->mutable_cf_options,
+          cf_sv_pair.cfd->user_comparator(), iter,
+          cf_sv_pair.super_version->current, kMaxSequenceNumber,
+          nullptr /*read_callback*/, /*active_mem=*/nullptr, cf_sv_pair.cfh));
+    }
+"#,
+        with: r#"
+    // Unreachable: tailing iterators are rejected before this point.
+    assert(false);
+"#,
+    },
 ];
 
 /// The C++ in a raw string, without the newline after its opening quote.

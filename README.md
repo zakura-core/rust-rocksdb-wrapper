@@ -69,7 +69,9 @@ RocksDB's 329 library sources and leaves about 570 KB less code in the final
 binary. Without `full`, these features return `NotSupported` or fail to open:
 SST file ingestion, column family import, remote compaction
 (`CompactionService`), tracing and trace replay, encrypted file systems, plain
-tables, cuckoo tables created from an options string, and TTL databases.
+tables, cuckoo tables created from an options string, TTL databases, tailing
+iterators (`ReadOptions::set_tailing`), and multi-column-family coalescing and
+attribute group iterators.
 
 `librocksdb-sys/zakura_minimal.rs` makes the source edits that cut those
 features off, and `librocksdb-sys/zakura_excluded_sources.txt` lists the
