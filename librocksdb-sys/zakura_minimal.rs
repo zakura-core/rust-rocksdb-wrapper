@@ -357,6 +357,36 @@ std::unique_ptr<AttributeGroupIterator> DBImpl::NewAttributeGroupIterator(
     assert(false);
 "#,
     },
+    // The in-memory mock `Env` and `FileSystem`, which RocksDB's object
+    // registry can create by name.
+    Edit::Replace {
+        file: "env/env.cc",
+        find: r#"
+                                                    std::string* /* errmsg */) {
+    guard->reset(MockEnv::Create(Env::Default()));
+    return guard->get();
+"#,
+        with: r#"
+                                                    std::string* errmsg) {
+    *errmsg = "the mock Env is not built in";
+    guard->reset();
+    return guard->get();
+"#,
+    },
+    Edit::Replace {
+        file: "env/file_system.cc",
+        find: r#"
+         std::string* /*errmsg*/) {
+        guard->reset(new MockFileSystem(SystemClock::Default()));
+        return guard->get();
+"#,
+        with: r#"
+         std::string* errmsg) {
+        *errmsg = "the mock FileSystem is not built in";
+        guard->reset();
+        return guard->get();
+"#,
+    },
 ];
 
 /// The C++ in a raw string, without the newline after its opening quote.
