@@ -70,8 +70,9 @@ binary. Without `full`, these features return `NotSupported` or fail to open:
 SST file ingestion, column family import, remote compaction
 (`CompactionService`), tracing and trace replay, encrypted file systems, plain
 tables, cuckoo tables created from an options string, TTL databases, tailing
-iterators (`ReadOptions::set_tailing`), and multi-column-family coalescing and
-attribute group iterators.
+iterators (`ReadOptions::set_tailing`), multi-column-family coalescing and
+attribute group iterators, and creating the in-memory mock `Env` and
+`FileSystem` by name through the object registry (`Env::mem_env` still works).
 
 `librocksdb-sys/zakura_minimal.rs` makes the source edits that cut those
 features off, and `librocksdb-sys/zakura_excluded_sources.txt` lists the
